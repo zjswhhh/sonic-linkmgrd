@@ -999,6 +999,7 @@ void ActiveStandbyStateMachine::handleMuxWaitTimeout(boost::system::error_code e
     if (errorCode == boost::system::errc::success) {
         if (mMuxStateMachine.getWaitStateCause() == mux_state::WaitState::WaitStateCause::SwssUpdate) {
             MUXLOGTIMEOUT(mMuxPortConfig.getPortName(), "orchagent timed out responding to linkmgrd", mCompositeState);
+            enterMuxWaitState(mCompositeState);
         } else if (mMuxStateMachine.getWaitStateCause() == mux_state::WaitState::WaitStateCause::DriverUpdate) {
             MUXLOGTIMEOUT(mMuxPortConfig.getPortName(), "xcvrd timed out responding to linkmgrd", mCompositeState);
             // send switch active command to peer

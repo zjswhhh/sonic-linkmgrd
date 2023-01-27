@@ -320,7 +320,6 @@ TEST_F(LinkManagerStateMachineTest, MuxActiveRemoteSwitchOver)
 
     postLinkProberEvent(link_prober::LinkProberState::Standby, 2);
     VALIDATE_STATE(Standby, Wait, Up);
-    EXPECT_EQ(mDbInterfacePtr->mProbeMuxStateInvokeCount, 0);
 
     // swss notification
     handleMuxState("standby", 3);
