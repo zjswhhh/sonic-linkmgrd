@@ -132,4 +132,9 @@ void FakeDbInterface::postSwitchCause(
     mLastPostedSwitchCause = cause;
 }
 
+std::map<std::string, std::string> FakeDbInterface::getMuxModeConfig()
+{
+    mGetMuxModeConfigInvokeCount++;
+}
+
 } /* namespace test */
