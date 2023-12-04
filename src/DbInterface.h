@@ -395,7 +395,7 @@ public:
     *
     *@return port to mux mode map
     */
-    std::map<std::string, std::string> getMuxModeConfig();
+    virtual std::map<std::string, std::string> getMuxModeConfig();
 
 private:
     friend class test::MuxManagerTest;
