@@ -878,6 +878,7 @@ private:
 
     std::shared_ptr<swss::DBConnector> mAppDbPtr;
     std::shared_ptr<swss::DBConnector> mStateDbPtr;
+    std::shared_ptr<swss::DBConnector> mConfigDbPtr;
     std::shared_ptr<swss::Table> mMuxStateTablePtr;
 
     // for communicating with orchagent

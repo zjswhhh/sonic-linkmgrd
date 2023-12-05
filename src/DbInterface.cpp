@@ -308,6 +308,7 @@ void DbInterface::initialize()
     try {
         mAppDbPtr = std::make_shared<swss::DBConnector> ("APPL_DB", 0);
         mStateDbPtr = std::make_shared<swss::DBConnector> ("STATE_DB", 0);
+        mConfigDbPtr = std::make_shared<swss::DBConnector> ("CONFIG_DB", 0);
 
         mAppDbMuxTablePtr = std::make_shared<swss::ProducerStateTable> (
             mAppDbPtr.get(), APP_MUX_CABLE_TABLE_NAME
@@ -871,9 +872,7 @@ void DbInterface::getSoCIpAddress(std::shared_ptr<swss::DBConnector> configDbCon
 //
 std::map<std::string, std::string> DbInterface::getMuxModeConfig()
 {
-    MUXLOGINFO("Reading MUX mode configuration");
-    std::shared_ptr<swss::DBConnector> configDbPtr = std::make_shared<swss::DBConnector> ("CONFIG_DB", 0);
-    swss::Table configDbMuxCableTable(configDbPtr.get(), CFG_MUX_CABLE_TABLE_NAME);
+    swss::Table configDbMuxCableTable(mConfigDbPtr.get(), CFG_MUX_CABLE_TABLE_NAME);
     std::vector<swss::KeyOpFieldsValuesTuple> entries;
     std::map<std::string, std::string> PortToMuxModeConfigMapping;
 
@@ -884,17 +883,13 @@ std::map<std::string, std::string> DbInterface::getMuxModeConfig()
         std::vector<swss::FieldValueTuple> fieldValues = kfvFieldsValues(entry);
 
         std::vector<swss::FieldValueTuple>::const_iterator cit = std::find_if(
-            fieldValues.cbegin(),
-            fieldValues.cend(),
+            fieldValues.cbegin(), fieldValues.cend(),
             [] (const swss::FieldValueTuple &fv) {return fvField(fv) == "state";}
         );
 
         if (cit != fieldValues.cend()) {
             const std::string f = cit->first;
             std::string muxMode = cit->second;
-
-            MUXLOGDEBUG(boost::format("port: %s, mode mux %s = %s") % portName % f % muxMode);
-
             PortToMuxModeConfigMapping[portName] = muxMode;
         } else {
             MUXLOGERROR(boost::format("port: %s, mode mux is not found in %s table") % portName % CFG_MUX_CABLE_TABLE_NAME);

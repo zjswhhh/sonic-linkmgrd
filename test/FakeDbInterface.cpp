@@ -138,6 +138,7 @@ std::map<std::string, std::string> FakeDbInterface::getMuxModeConfig()
 
     std::map<std::string, std::string> muxModeConfig;
     muxModeConfig["Ethernet0"] = "manual";
+    muxModeConfig["Ethernet4"] = "auto";
     return muxModeConfig;
 }
 

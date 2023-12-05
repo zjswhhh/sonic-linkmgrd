@@ -576,7 +576,7 @@ void MuxManager::handleWarmRestartReconciliationTimeout(const boost::system::err
             continue;
         }
 
-        MUXLOGWARNING(boost::format("config mux mode back to auto for %s") % it->first);
+        MUXLOGWARNING(boost::format("%s: config mux mode from %s back to auto.") % it->first % it->second);
         mDbInterfacePtr->setMuxMode(it->first, "auto");
     }
 
