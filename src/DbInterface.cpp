@@ -1684,6 +1684,7 @@ void DbInterface::updateIntervalv4(uint32_t tx_interval, uint32_t rx_interval)
     boost::asio::post(mStrand, boost::bind(
         &DbInterface::handleUpdateInterval,
         this,
+        true,
         tx_interval,
         rx_interval
     ));
@@ -1701,28 +1702,57 @@ void DbInterface::updateIntervalv6(uint32_t tx_interval, uint32_t rx_interval)
     boost::asio::post(mStrand, boost::bind(
         &DbInterface::handleUpdateInterval,
         this,
+        false,
         tx_interval,
         rx_interval
     ));
 }
 
 //
-// --->handleUpdateInterval(uint32_t tx_interval, uint32_t rx_interval);
+// ---> getIcmpEchoSessions();
 //
-// handles update of tx/rx interval field for ICMP_ECHO_SESSION in APP_ICMP_ECHO_SESSION_TABL
+// reads the current ICMP echo session fields from APPL_DB
 //
-void DbInterface::handleUpdateInterval(uint32_t tx_interval, uint32_t rx_interval)
+std::vector<swss::KeyOpFieldsValuesTuple> DbInterface::getIcmpEchoSessions()
 {
     std::shared_ptr<swss::DBConnector> appDbPtr = std::make_shared<swss::DBConnector> ("APPL_DB", 0);
     swss::Table icmpAppDbTbl(appDbPtr.get(), APP_ICMP_ECHO_SESSION_TABLE_NAME);
     std::vector<std::string> keys;
     icmpAppDbTbl.getKeys(keys);
-    std::vector<swss::FieldValueTuple> fvs;
-    fvs.emplace_back("tx_interval", std::to_string(tx_interval));
-    fvs.emplace_back("rx_interval", std::to_string(rx_interval));
-    for (auto& key : keys)
-    {
-        mAppDbIcmpEchoSessionTablePtr->set(key, fvs);
+    std::vector<swss::KeyOpFieldsValuesTuple> sessions;
+    for (const auto &key : keys) {
+        std::vector<swss::FieldValueTuple> fields;
+        if (icmpAppDbTbl.get(key, fields)) {
+            sessions.emplace_back(key, "SET", std::move(fields));
+        }
+    }
+    return sessions;
+}
+
+void DbInterface::setIcmpEchoSessionFields(const std::string &key, const std::vector<swss::FieldValueTuple> &fields)
+{
+    mAppDbIcmpEchoSessionTablePtr->set(key, fields);
+}
+
+void DbInterface::handleUpdateInterval(bool isIpv4, uint32_t tx_interval, uint32_t rx_interval)
+{
+    std::vector<swss::FieldValueTuple> intervals = {
+        {"tx_interval", std::to_string(tx_interval)},
+        {"rx_interval", std::to_string(rx_interval)},
+    };
+    for (const auto &session : getIcmpEchoSessions()) {
+        const auto &fields = kfvFieldsValues(session);
+        auto destination = std::find_if(fields.begin(), fields.end(), [](const auto &field) {
+            return fvField(field) == "dst_ip";
+        });
+        if (destination == fields.end()) {
+            continue;
+        }
+        boost::system::error_code error;
+        auto address = boost::asio::ip::make_address(fvValue(*destination), error);
+        if (!error && address.is_v4() == isIpv4) {
+            setIcmpEchoSessionFields(kfvKey(session), intervals);
+        }
     }
 }
 

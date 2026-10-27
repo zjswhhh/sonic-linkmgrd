@@ -104,6 +104,8 @@ public:
     void updateProberType(const std::string &portName, const std::string &proberType);
     void setTimeoutIpv4_msec(uint32_t timeout_msec);
     void setTimeoutIpv6_msec(uint32_t timeout_msec);
+    void enableDefaultRouteFeature(bool enabled);
+    link_manager::LinkManagerStateMachineBase::DefaultRoute getDefaultRouteState(const std::string &port);
 
 public:
     static const std::string PortName;

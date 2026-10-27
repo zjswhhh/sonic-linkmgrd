@@ -914,6 +914,61 @@ TEST_F(MuxManagerTest, SoCIpAddressFallsBackToIpv6)
     EXPECT_EQ(getBladeIpv4Address(port).to_string(), "2603:10e1:100:f::2");
 }
 
+void MuxManagerTest::enableDefaultRouteFeature(bool enabled)
+{
+    mMuxManagerPtr->mMuxConfig.enableDefaultRouteFeature(enabled);
+}
+
+link_manager::LinkManagerStateMachineBase::DefaultRoute MuxManagerTest::getDefaultRouteState(const std::string &port)
+{
+    return mMuxManagerPtr->mPortMap.at(port)->getLinkManagerStateMachinePtr()->getDefaultRouteState();
+}
+
+TEST_F(MuxManagerTest, DefaultRouteUsesSelectedAddressFamily)
+{
+    using DefaultRoute = link_manager::LinkManagerStateMachineBase::DefaultRoute;
+    createPort(PortName, common::MuxPortConfig::PortCableType::ActiveActive);
+    enableDefaultRouteFeature(true);
+    mMuxManagerPtr->addOrUpdateDefaultRouteState(true, "na");
+    mMuxManagerPtr->addOrUpdateDefaultRouteState(false, "ok");
+    std::vector<swss::KeyOpFieldsValuesTuple> servers = {
+        {PortName, "SET", {{"soc_ipv6", "fc02:1000::3/128"}}},
+    };
+    processSoCIpAddress(servers);
+    pollIoService(50);
+    EXPECT_EQ(DefaultRoute::OK, getDefaultRouteState(PortName));
+
+    mMuxManagerPtr->addOrUpdateDefaultRouteState(true, "ok");
+    mMuxManagerPtr->addOrUpdateDefaultRouteState(false, "na");
+    pollIoService(50);
+    EXPECT_EQ(DefaultRoute::NA, getDefaultRouteState(PortName));
+    mMuxManagerPtr->addOrUpdateDefaultRouteState(true, "na");
+    mMuxManagerPtr->addOrUpdateDefaultRouteState(false, "ok");
+    servers = {{PortName, "SET", {{"soc_ipv4", "192.168.0.3/32"}, {"soc_ipv6", "fc02:1000::3/128"}}}};
+    processSoCIpAddress(servers);
+    pollIoService(50);
+    EXPECT_TRUE(getBladeIpv4Address(PortName).is_v4());
+    EXPECT_EQ(DefaultRoute::NA, getDefaultRouteState(PortName));
+
+    enableDefaultRouteFeature(false);
+    mMuxManagerPtr->addOrUpdateDefaultRouteState(false, "na");
+    pollIoService(50);
+    EXPECT_EQ(DefaultRoute::OK, getDefaultRouteState(PortName));
+}
+
+TEST_F(MuxManagerTest, DefaultRouteFollowsQueuedAddressUpdate)
+{
+    createPort(PortName, common::MuxPortConfig::PortCableType::ActiveActive);
+    enableDefaultRouteFeature(true);
+    std::vector<swss::KeyOpFieldsValuesTuple> servers = {
+        {PortName, "SET", {{"soc_ipv6", "fc02:1000::3/128"}}},
+    };
+    processSoCIpAddress(servers);
+    mMuxManagerPtr->addOrUpdateDefaultRouteState(false, "ok");
+    pollIoService(50);
+    EXPECT_EQ(link_manager::LinkManagerStateMachineBase::DefaultRoute::OK, getDefaultRouteState(PortName));
+}
+
 TEST_F(MuxManagerTest, TxIntervalChangeTest)
 {
     std::string port = "Ethernet0";

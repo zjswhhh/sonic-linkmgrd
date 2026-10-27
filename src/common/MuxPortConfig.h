@@ -204,7 +204,10 @@ public:
     *
     *@return suspend timer timeout
     */
-    inline uint32_t getLinkWaitTimeout_msec() const {return mMuxConfig.getSuspendTimeout_msec();};
+    inline uint32_t getLinkWaitTimeout_msec() const {
+        uint32_t interval = getBladeIpv4Address().is_v6() ? getTimeoutIpv6_msec() : getTimeoutIpv4_msec();
+        return (getNegativeStateChangeRetryCount() + 1) * interval;
+    };
 
     /**
     *@method getIfOscillationEnabled

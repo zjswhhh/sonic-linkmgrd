@@ -310,6 +310,22 @@ TEST_F(LinkProberTest, GenerateGuidAddressFamilies)
     EXPECT_EQ(expectedIpv4Guid, ipv4Guid);
 }
 
+TEST_F(LinkProberTest, SuspendTimeoutUsesSelectedAddressFamily)
+{
+    mMuxConfig.setTimeoutIpv4_msec(100);
+    mMuxConfig.setTimeoutIpv6_msec(1000);
+    mMuxConfig.setNegativeStateChangeRetryCount(3);
+    const auto &config = mFakeMuxPort.getMuxPortConfig();
+    mFakeMuxPort.setServerIpv4Address(boost::asio::ip::make_address("192.168.0.3"));
+    EXPECT_EQ(400u, config.getLinkWaitTimeout_msec());
+    mFakeMuxPort.setServerIpv4Address(boost::asio::ip::make_address("fc02:1000::3"));
+    EXPECT_EQ(4000u, config.getLinkWaitTimeout_msec());
+    mMuxConfig.setTimeoutIpv4_msec(200);
+    EXPECT_EQ(4000u, config.getLinkWaitTimeout_msec());
+    mMuxConfig.setTimeoutIpv6_msec(1500);
+    EXPECT_EQ(6000u, config.getLinkWaitTimeout_msec());
+}
+
 TEST_F(LinkProberTest, UpdateToRMac)
 {
     std::array<uint8_t, ETHER_ADDR_LEN> torMac = {0, 'b', 2, 'd', 4, 'f'};

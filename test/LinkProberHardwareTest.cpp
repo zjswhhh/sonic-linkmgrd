@@ -279,6 +279,47 @@ TEST_F(LinkProberHardwareTest, LinkProberHardwareHandleIcmpPayload)
     TearDown();
 }
 
+TEST_F(LinkProberHardwareTest, RuntimeIntervalsAreFamilyScoped)
+{
+    auto &sessions = mDbInterfacePtr->mIcmpSessions;
+    for (const auto &sessionType : {"NORMAL", "RX"}) {
+        sessions[std::string("v4-") + sessionType] = {
+            {"dst_ip", "192.168.0.3"}, {"tx_interval", "100"}, {"rx_interval", "300"},
+        };
+        sessions[std::string("v6-") + sessionType] = {
+            {"dst_ip", "fc02:1000::3"}, {"tx_interval", "1000"}, {"rx_interval", "3000"},
+        };
+    }
+    sessions["missing"] = {{"tx_interval", "100"}};
+    sessions["invalid"] = {{"dst_ip", "invalid"}, {"tx_interval", "100"}};
+    auto before = sessions;
+
+    mDbInterfacePtr->mux::DbInterface::updateIntervalv4(200, 600);
+    runIoService(1);
+    for (const auto &sessionType : {"NORMAL", "RX"}) {
+        auto expected = before.at(std::string("v4-") + sessionType);
+        expected[1].second = "200";
+        expected[2].second = "600";
+        EXPECT_EQ(expected, sessions.at(std::string("v4-") + sessionType));
+        EXPECT_EQ(before.at(std::string("v6-") + sessionType), sessions.at(std::string("v6-") + sessionType));
+    }
+    EXPECT_EQ(before.at("missing"), sessions.at("missing"));
+    EXPECT_EQ(before.at("invalid"), sessions.at("invalid"));
+
+    before = sessions;
+    mDbInterfacePtr->mux::DbInterface::updateIntervalv6(2000, 6000);
+    runIoService(1);
+    for (const auto &sessionType : {"NORMAL", "RX"}) {
+        auto expected = before.at(std::string("v6-") + sessionType);
+        expected[1].second = "2000";
+        expected[2].second = "6000";
+        EXPECT_EQ(expected, sessions.at(std::string("v6-") + sessionType));
+        EXPECT_EQ(before.at(std::string("v4-") + sessionType), sessions.at(std::string("v4-") + sessionType));
+    }
+    EXPECT_EQ(before.at("missing"), sessions.at("missing"));
+    EXPECT_EQ(before.at("invalid"), sessions.at("invalid"));
+}
+
 TEST_F(LinkProberHardwareTest, CreateIcmpEchoSessionIpv6)
 {
     boost::asio::ip::address loopbackIpv6Address = boost::asio::ip::make_address("fc02:1000::1");
@@ -298,8 +339,8 @@ TEST_F(LinkProberHardwareTest, CreateIcmpEchoSessionIpv6)
 
     auto srcIpEntry = findEntry("src_ip");
     auto dstIpEntry = findEntry("dst_ip");
-    EXPECT_TRUE(srcIpEntry != mDbInterfacePtr->mLastIcmpSessionEntries.end());
-    EXPECT_TRUE(dstIpEntry != mDbInterfacePtr->mLastIcmpSessionEntries.end());
+    ASSERT_TRUE(srcIpEntry != mDbInterfacePtr->mLastIcmpSessionEntries.end());
+    ASSERT_TRUE(dstIpEntry != mDbInterfacePtr->mLastIcmpSessionEntries.end());
     EXPECT_TRUE(srcIpEntry->second == loopbackIpv6Address.to_string());
     EXPECT_TRUE(dstIpEntry->second == bladeIpv6Address.to_string());
 }

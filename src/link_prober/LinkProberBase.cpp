@@ -312,6 +312,11 @@ void LinkProberBase::handleRecv(
             (bytesTransferred - packetHeaderSize)
         );
 
+        if (bytesTransferred < packetHeaderSize + sizeof(IcmpPayload)) {
+            startRecv();
+            return;
+        }
+
         IcmpPayload *icmpPayload = reinterpret_cast<IcmpPayload *> (
             mRxBuffer.data() + packetHeaderSize
         );
