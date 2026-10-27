@@ -277,6 +277,39 @@ TEST_F(LinkProberTest, GenerateGuid)
     ) == 0);
 }
 
+TEST_F(LinkProberTest, GenerateGuidAddressFamilies)
+{
+    auto generateGuid = [this](const std::string &loopback, const std::string &soc) {
+        auto loopbackAddress = boost::asio::ip::make_address(loopback);
+        auto socAddress = boost::asio::ip::make_address(soc);
+        if (loopbackAddress.is_v6()) {
+            mMuxConfig.setLoopback3Ipv6Address(loopbackAddress);
+        } else {
+            mMuxConfig.setLoopback3Ipv4Address(loopbackAddress);
+        }
+        mFakeMuxPort.setServerIpv4Address(socAddress);
+        link_prober::LinkProberSw prober(
+            const_cast<common::MuxPortConfig&>(mFakeMuxPort.getMuxPortConfig()),
+            mIoService,
+            mFakeMuxPort.getLinkProberStateMachinePtr()
+        );
+        return prober.mSelfUUID;
+    };
+
+    const auto upperGuid = generateGuid("fc00:1:0:38::", "fc02:1000::3");
+    const auto lowerGuid = generateGuid("fc00:1:0:39::", "fc02:1000::3");
+    EXPECT_NE(upperGuid, lowerGuid);
+    EXPECT_EQ(upperGuid, generateGuid("fc00:1:0:38::", "fc02:1000::3"));
+    EXPECT_NE(upperGuid, generateGuid("fc00:1:0:38::", "fc02:1001::3"));
+    EXPECT_NE(upperGuid, generateGuid("fc01:1:0:38::", "fc02:1000::3"));
+
+    const auto ipv4Guid = generateGuid("10.1.0.38", "192.168.0.3");
+    const auto expectedIpv4Guid = boost::lexical_cast<boost::uuids::uuid>(
+        "00000000-0000-0000-0000-000000260003"
+    );
+    EXPECT_EQ(expectedIpv4Guid, ipv4Guid);
+}
+
 TEST_F(LinkProberTest, UpdateToRMac)
 {
     std::array<uint8_t, ETHER_ADDR_LEN> torMac = {0, 'b', 2, 'd', 4, 'f'};

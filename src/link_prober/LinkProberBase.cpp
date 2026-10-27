@@ -870,30 +870,22 @@ void LinkProberBase::getGuidStr(const IcmpPayload *icmpPayload, std::string& gui
 //
 std::string LinkProberBase::generateGuid()
 {
-    // Get the last 16 bits from Loopback3 IP address
     boost::asio::ip::address loopback3Ip = getLoopback3Address();
-    uint16_t loopback3Last16Bits;
-    if (loopback3Ip.is_v6()) {
-        auto bytes = loopback3Ip.to_v6().to_bytes();
-        loopback3Last16Bits = (static_cast<uint16_t>(bytes[14]) << 8) | bytes[15];
-    } else {
-        uint32_t loopback3Ipv4 = loopback3Ip.to_v4().to_uint();
-        loopback3Last16Bits = static_cast<uint16_t>(loopback3Ipv4 & 0xFFFF);
-    }
-
-    // Get the last 16 bits from SoC/Blade IP address
     boost::asio::ip::address socIp = mMuxPortConfig.getBladeIpv4Address();
-    uint16_t socLast16Bits;
+    uint32_t deterministicGuid;
     if (socIp.is_v6()) {
-        auto bytes = socIp.to_v6().to_bytes();
-        socLast16Bits = (static_cast<uint16_t>(bytes[14]) << 8) | bytes[15];
+        deterministicGuid = 2166136261U;
+        for (const auto &address : {loopback3Ip, socIp}) {
+            for (uint8_t octet : address.to_v6().to_bytes()) {
+                deterministicGuid ^= octet;
+                deterministicGuid *= 16777619U;
+            }
+        }
     } else {
-        uint32_t socIpv4 = socIp.to_v4().to_uint();
-        socLast16Bits = static_cast<uint16_t>(socIpv4 & 0xFFFF);
+        uint16_t loopback3Last16Bits = static_cast<uint16_t>(loopback3Ip.to_v4().to_uint() & 0xFFFF);
+        uint16_t socLast16Bits = static_cast<uint16_t>(socIp.to_v4().to_uint() & 0xFFFF);
+        deterministicGuid = (static_cast<uint32_t>(loopback3Last16Bits) << 16) | socLast16Bits;
     }
-
-    // Combine the two 16-bit values to form a 32-bit GUID
-    uint32_t deterministicGuid = (static_cast<uint32_t>(loopback3Last16Bits) << 16) | socLast16Bits;
     uint32_t reverseGuid =  htonl(deterministicGuid);
 
     char guidStr[16];
