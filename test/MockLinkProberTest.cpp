@@ -126,8 +126,8 @@ void LinkProberMockTest::buildIcmpReply()
     if (mMuxPortConfig.getBladeIpv4Address().is_v6()) {
         auto *txIpHeader = reinterpret_cast<ip6_hdr *>(getTxBuffer().data() + sizeof(ether_header));
         auto *rxIpHeader = reinterpret_cast<ip6_hdr *>(mBuffer.data() + sizeof(ether_header));
-        rxIpHeader->ip6_src = txIpHeader->ip6_dst;
-        rxIpHeader->ip6_dst = txIpHeader->ip6_src;
+        memcpy(&rxIpHeader->ip6_src, &txIpHeader->ip6_dst, sizeof(rxIpHeader->ip6_src));
+        memcpy(&rxIpHeader->ip6_dst, &txIpHeader->ip6_src, sizeof(rxIpHeader->ip6_dst));
         auto *icmpHeader = reinterpret_cast<icmphdr *>(mBuffer.data() + getPacketHeaderSize() - sizeof(icmphdr));
         icmpHeader->type = ICMP6_ECHO_REPLY;
         mLinkProberPtr->computeIcmpv6Checksum(icmpHeader, getTxPacketSize() - getPacketHeaderSize() + sizeof(icmphdr));
