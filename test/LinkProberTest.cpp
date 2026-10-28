@@ -279,6 +279,8 @@ TEST_F(LinkProberTest, GenerateGuid)
 
 TEST_F(LinkProberTest, GenerateGuidAddressFamilies)
 {
+    auto loopback2Address = boost::asio::ip::make_address("fc00:2::1");
+    mMuxConfig.setLoopbackIpv6Address(loopback2Address);
     auto generateGuid = [this](const std::string &loopback, const std::string &soc) {
         auto loopbackAddress = boost::asio::ip::make_address(loopback);
         auto socAddress = boost::asio::ip::make_address(soc);
@@ -425,6 +427,30 @@ TEST_F(LinkProberTest, ReadWriteVariableSizedTlv)
     }
 
     EXPECT_TRUE(findNextTlv(rxReadOffset, bytesTransferred) == 0);
+}
+
+TEST_F(LinkProberTest, ConstructionRequiresSelectedFamilyLoopbacks)
+{
+    auto createProber = [&]() {
+        return std::make_unique<link_prober::LinkProberSw>(
+            const_cast<common::MuxPortConfig &>(mFakeMuxPort.getMuxPortConfig()),
+            mIoService, mFakeMuxPort.getLinkProberStateMachinePtr());
+    };
+    EXPECT_NO_THROW(createProber());
+
+    auto endpoint = boost::asio::ip::make_address("fc02:1001::2");
+    auto loopback = boost::asio::ip::make_address("fc02:1000::1");
+    auto loopback3 = boost::asio::ip::make_address("fc02:1002::1");
+    auto unspecified = boost::asio::ip::make_address("::");
+    mFakeMuxPort.setServerIpv4Address(endpoint);
+    EXPECT_THROW(createProber(), common::ConfigNotFoundException);
+    mMuxConfig.setLoopbackIpv6Address(loopback);
+    EXPECT_THROW(createProber(), common::ConfigNotFoundException);
+    mMuxConfig.setLoopbackIpv6Address(unspecified);
+    mMuxConfig.setLoopback3Ipv6Address(loopback3);
+    EXPECT_THROW(createProber(), common::ConfigNotFoundException);
+    mMuxConfig.setLoopbackIpv6Address(loopback);
+    EXPECT_NO_THROW(createProber());
 }
 
 TEST_F(LinkProberTest, InitializeException)

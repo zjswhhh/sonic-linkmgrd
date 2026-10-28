@@ -311,6 +311,7 @@ public:
     */
     inline uint32_t getProbingInterval() {
         MUXLOGDEBUG(mMuxPortConfig.getPortName());
+        // Switchover measurement intentionally uses the same fast interval for both families.
         return mDecreaseProbingInterval ?
             mMuxPortConfig.getDecreasedTimeoutIpv4_msec() :
             (isIpv6Probing() ? mMuxPortConfig.getTimeoutIpv6_msec() : mMuxPortConfig.getTimeoutIpv4_msec());

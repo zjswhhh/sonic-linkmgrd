@@ -64,6 +64,15 @@ LinkProberBase::LinkProberBase(common::MuxPortConfig &muxPortConfig, boost::asio
     mSuspendTimer(mIoService),
     mSwitchoverTimer(mIoService)
 {
+    const auto loopback = getLoopbackAddress();
+    const auto loopback3 = getLoopback3Address();
+    if (loopback.is_unspecified() || loopback3.is_unspecified() ||
+        loopback.is_v6() != isIpv6Probing() || loopback3.is_v6() != isIpv6Probing()) {
+        throw MUX_ERROR(ConfigNotFound, mMuxPortConfig.getPortName() +
+            ": cannot create " + (isIpv6Probing() ? "IPv6" : "IPv4") +
+            " link prober: selected-family Loopback2 and Loopback3 must be configured; Loopback2=" +
+            loopback.to_string() + ", Loopback3=" + loopback3.to_string());
+    }
     setSelfGuidData(generateGuid());
 }
 
@@ -147,18 +156,11 @@ void LinkProberBase::setupSocket() {
     addr.sll_family = AF_PACKET;
     addr.sll_protocol = htons(ETH_P_ALL);
 
-    mSocket = socket(AF_PACKET, SOCK_RAW | SOCK_NONBLOCK, htons(ETH_P_ALL));
+    mSocket = socket(AF_PACKET, SOCK_RAW | SOCK_NONBLOCK, 0);
     if (mSocket < 0) {
         std::ostringstream errMsg;
         errMsg << "Failed to open socket with '" << strerror(errno) << "'"
                << std::endl;
-        throw MUX_ERROR(SocketError, errMsg.str());
-    }
-
-    if (bind(mSocket, (struct sockaddr *) &addr, sizeof(addr))) {
-        std::ostringstream errMsg;
-        errMsg << "Failed to bind to interface '" << mMuxPortConfig.getPortName() << "' with '"
-               << strerror(errno) << "'" << std::endl;
         throw MUX_ERROR(SocketError, errMsg.str());
     }
 
@@ -167,6 +169,13 @@ void LinkProberBase::setupSocket() {
         std::ostringstream errMsg;
         errMsg << "Failed to attach filter with '" << strerror(errno) << "'"
                << std::endl;
+        throw MUX_ERROR(SocketError, errMsg.str());
+    }
+
+    if (bind(mSocket, (struct sockaddr *) &addr, sizeof(addr))) {
+        std::ostringstream errMsg;
+        errMsg << "Failed to bind to interface '" << mMuxPortConfig.getPortName() << "' with '"
+               << strerror(errno) << "'" << std::endl;
         throw MUX_ERROR(SocketError, errMsg.str());
     }
 
@@ -312,7 +321,8 @@ void LinkProberBase::handleRecv(
             (bytesTransferred - packetHeaderSize)
         );
 
-        if (bytesTransferred < packetHeaderSize + sizeof(IcmpPayload)) {
+        if (sourceAddress != mMuxPortConfig.getBladeIpv4Address().to_string() ||
+            bytesTransferred < packetHeaderSize + sizeof(IcmpPayload)) {
             startRecv();
             return;
         }

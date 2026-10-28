@@ -320,14 +320,41 @@ TEST_F(LinkProberHardwareTest, RuntimeIntervalsAreFamilyScoped)
     EXPECT_EQ(before.at("invalid"), sessions.at("invalid"));
 }
 
+TEST_F(LinkProberHardwareTest, MissingIpv6LoopbacksCannotCreateSessions)
+{
+    auto endpoint = boost::asio::ip::make_address("fc02:1001::2");
+    auto loopback = boost::asio::ip::make_address("fc02:1000::1");
+    auto loopback3 = boost::asio::ip::make_address("fc02:1002::1");
+    auto unspecified = boost::asio::ip::make_address("::");
+    mFakeMuxPort.setServerIpv4Address(endpoint);
+    auto createSession = [&]() {
+        link_prober::LinkProberHw prober(
+            const_cast<common::MuxPortConfig &>(mFakeMuxPort.getMuxPortConfig()),
+            mIoService, mFakeMuxPort.getLinkProberStateMachinePtr(), &mFakeMuxPort);
+        prober.startProbing();
+    };
+    EXPECT_THROW(createSession(), common::ConfigNotFoundException);
+    mMuxConfig.setLoopbackIpv6Address(loopback);
+    EXPECT_THROW(createSession(), common::ConfigNotFoundException);
+    mMuxConfig.setLoopbackIpv6Address(unspecified);
+    mMuxConfig.setLoopback3Ipv6Address(loopback3);
+    EXPECT_THROW(createSession(), common::ConfigNotFoundException);
+    EXPECT_TRUE(mDbInterfacePtr->mLastIcmpSessionEntries.empty());
+}
+
 TEST_F(LinkProberHardwareTest, CreateIcmpEchoSessionIpv6)
 {
     boost::asio::ip::address loopbackIpv6Address = boost::asio::ip::make_address("fc02:1000::1");
+    auto loopback3Ipv6Address = boost::asio::ip::make_address("fc02:1002::1");
     boost::asio::ip::address bladeIpv6Address = boost::asio::ip::make_address("fc02:1001::2");
     mMuxConfig.setLoopbackIpv6Address(loopbackIpv6Address);
+    mMuxConfig.setLoopback3Ipv6Address(loopback3Ipv6Address);
     mFakeMuxPort.setServerIpv4Address(bladeIpv6Address);
 
-    mLinkProber.startProbing();
+    link_prober::LinkProberHw prober(
+        const_cast<common::MuxPortConfig &>(mFakeMuxPort.getMuxPortConfig()),
+        mIoService, mFakeMuxPort.getLinkProberStateMachinePtr(), &mFakeMuxPort);
+    prober.startProbing();
 
     auto findEntry = [&](const std::string &field) {
         return std::find_if(

@@ -298,6 +298,30 @@ TEST_F(LinkProberMockTest, LinkProberActiveStandbyIgnoresShortCommandTlv)
     TearDown();
 }
 
+TEST_F(LinkProberMockTest, RejectsRepliesFromOtherEndpoints)
+{
+    for (bool ipv6 : {false, true}) {
+        SetUp(common::MuxPortConfig::PortCableType::ActiveActive, ipv6);
+        EXPECT_CALL(*getLinkManagerStateMachinePtr(),
+            handlePeerLinkProberStateChange(link_prober::LinkProberState::Label::PeerActive)).Times(0);
+        sendHeartbeat();
+        receivePeerIcmpReply();
+        setPeerGuidData("");
+        if (ipv6) {
+            auto *header = reinterpret_cast<ip6_hdr *>(getRxBuffer().data() + sizeof(ether_header));
+            auto source = boost::asio::ip::make_address_v6("fc02:1000::99").to_bytes();
+            memcpy(&header->ip6_src, source.data(), source.size());
+        } else {
+            auto *header = reinterpret_cast<iphdr *>(getRxBuffer().data() + sizeof(ether_header));
+            header->saddr = htonl(boost::asio::ip::make_address_v4("192.168.0.99").to_uint());
+        }
+        handleRecv();
+        runIoService();
+        EXPECT_TRUE(getLinkProberPtr()->getPeerGuidData().empty());
+        TearDown();
+    }
+}
+
 TEST_F(LinkProberMockTest, Ipv6SelfAndPeerHeartbeats)
 {
     SetUp(common::MuxPortConfig::PortCableType::ActiveActive, true);
